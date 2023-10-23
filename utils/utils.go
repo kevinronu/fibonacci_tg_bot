@@ -34,6 +34,10 @@ func GetFibonacciNumberWithPosition(pos int) (int, error) {
 		return 1, nil
 	}
 
+	if pos >= 44 {
+		return 0, errors.New("The number must be less than 44, my developer did not buy more computing power :(")
+	}
+
 	a, _ := GetFibonacciNumberWithPosition(pos - 1)
 	b, _ := GetFibonacciNumberWithPosition(pos - 2)
 
