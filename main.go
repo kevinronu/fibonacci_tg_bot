@@ -20,14 +20,8 @@ func main() {
 }
 
 func handleTelegramWebHook(ctx context.Context, update Update) {
-	// update, err := parseTelegramRequest(req)
-	// if err != nil {
-	// 	log.Println("Error reading update:", err)
-	// 	return
-	// }
-
 	if update.Message.Text == "/start" {
-		log.Println("Hello")
+		log.Println("Printed welcome")
 		sendTextToTelegramChat(update.Message.Chat.Id, "Welcome! Please enter the position of the Fibonacci number you want to calculate:")
 	} else {
 		pos, err := utils.StringToInt(update.Message.Text)
@@ -35,12 +29,14 @@ func handleTelegramWebHook(ctx context.Context, update Update) {
 			sendTextToTelegramChat(update.Message.Chat.Id, err.Error())
 			return
 		}
+
 		result, err := utils.GetFibonacciNumberWithPosition(pos)
 		if err != nil {
 			sendTextToTelegramChat(update.Message.Chat.Id, err.Error())
 			return
 		}
-		log.Println(result)
+
+		log.Printf("Calculated number for position %s: %d", update.Message.Text, result)
 		sendTextToTelegramChat(update.Message.Chat.Id, fmt.Sprintf("The fibonacci number in position %d one is: %d", pos, result))
 	}
 }
