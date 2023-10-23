@@ -1,33 +1,91 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"strconv"
 
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/kevinronu/fibonacci-tg-bot/utils"
 )
 
 func main() {
-	portString := utils.GetEnv("SERVER_PORT")
-	// Create a custom ServeMux to register our handler
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleTelegramWebHook)
+	// Make the handler available for Remote Procedure Call by AWS Lambda
+	lambda.Start(handleTelegramWebHook)
+}
 
-	// Create an HTTP server
-	srv := &http.Server{
-		Addr:    ":" + portString,
-		Handler: mux,
-	}
+func handleTelegramWebHook(ctx context.Context, update Update) {
+	// update, err := parseTelegramRequest(req)
+	// if err != nil {
+	// 	log.Println("Error reading update:", err)
+	// 	return
+	// }
 
-	// Start the HTTP server
-	log.Println("INFO: Server is starting on port:", portString)
-	err := srv.ListenAndServe()
-	if err != nil {
-		log.Fatal("FATAL: Failed to start server:", err)
+	if update.Message.Text == "/start" {
+		log.Println("Hello")
+		sendTextToTelegramChat(update.Message.Chat.Id, "Welcome! Please enter the position of the Fibonacci number you want to calculate:")
+	} else {
+		pos, err := utils.StringToInt(update.Message.Text)
+		if err != nil {
+			sendTextToTelegramChat(update.Message.Chat.Id, err.Error())
+			return
+		}
+		result, err := utils.GetFibonacciNumberWithPosition(pos)
+		if err != nil {
+			sendTextToTelegramChat(update.Message.Chat.Id, err.Error())
+			return
+		}
+		log.Println(result)
+		sendTextToTelegramChat(update.Message.Chat.Id, fmt.Sprintf("The fibonacci number in position %d one is: %d", pos, result))
 	}
 }
 
-func handleTelegramWebHook(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("handleTelegramWebHook")
+func parseTelegramRequest(r *http.Request) (*Update, error) {
+	var update Update
+
+	err := json.NewDecoder(r.Body).Decode(&update)
+	if err != nil {
+		return nil, err
+	}
+
+	return &update, nil
+}
+
+func sendTextToTelegramChat(chatId int, text string) error {
+	tgBotToken := utils.GetEnv("TELEGRAM_BOT_TOKEN")
+	telegramApiBaseUrl := "https://api.telegram.org/bot"
+	telegramApiSendMessage := "/sendMessage"
+	var telegramApiUrl string = telegramApiBaseUrl + tgBotToken + telegramApiSendMessage
+
+	log.Printf("Sending %s to chat_id: %d", text, chatId)
+
+	response, err := http.PostForm(
+		telegramApiUrl,
+		url.Values{
+			"chat_id": {strconv.Itoa(chatId)},
+			"text":    {text},
+		})
+
+	if err != nil {
+		log.Printf("error when posting text to the chat: %s", err.Error())
+		return err
+	}
+
+	defer response.Body.Close()
+
+	var bodyBytes, errRead = io.ReadAll(response.Body)
+	if errRead != nil {
+		log.Printf("error in parsing telegram answer %s", errRead.Error())
+		return err
+	}
+
+	bodyString := string(bodyBytes)
+	log.Printf("Body of Telegram Response: %s", bodyString)
+
+	return nil
 }
